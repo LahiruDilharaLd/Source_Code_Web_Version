@@ -1,0 +1,8 @@
+{
+  "name": "web-sever",
+  "version": "1.0.0",
+  "description": "Loan ID runner - responsive web server",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=16.9" }
+}

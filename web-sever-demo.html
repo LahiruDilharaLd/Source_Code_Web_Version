@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Loan Runner</title>
+<style>
+  :root { --bg:#222; --panel:#2b2b2b; --line:#ffe600; --text:#f2f2f2; --muted:#aaa; --ok:#4cff7a; --err:#ff6b6b; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, Segoe UI, Roboto, sans-serif; padding: 12px; }
+  .frame { border: 2px solid var(--line); height: 100%; padding: 12px; display: flex; flex-direction: column; gap: 12px; max-width: 1400px; margin: 0 auto; }
+  .box { border: 2px solid var(--line); padding: 8px 12px; text-align: center; background: transparent; color: var(--text); min-width: 0; }
+  header { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  header .box { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; }
+  main { flex: 1; min-height: 0; display: flex; }
+  .actions { display: flex; gap: 12px; }
+  .actions button { min-width: 140px; }
+  .mark { margin-left: auto; font-weight: 700; letter-spacing: .5px; color: var(--line); opacity: .7; user-select: none; pointer-events: none; }
+  footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  button { cursor: pointer; font: inherit; }
+  button.box:hover:not(:disabled) { background: var(--line); color: #000; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  input, textarea { font: inherit; color: var(--text); background: var(--panel); border: 2px solid var(--line); padding: 8px 12px; width: 100%; }
+  input:focus, textarea:focus { outline: 2px solid #fff3; }
+  .hidden { display: none !important; }
+
+  /* login */
+  #login { width: 100%; display: flex; align-items: center; justify-content: center; border: 2px dotted var(--line); padding: 16px; }
+  .login-card { width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .msg { color: var(--err); min-height: 1.3em; text-align: center; }
+
+  /* app */
+  #app { width: 100%; display: grid; grid-template-columns: 1fr 2fr; gap: 12px; min-height: 0; }
+  #ids { resize: none; height: 100%; font-family: Consolas, monospace; }
+  .pane { display: flex; flex-direction: column; min-height: 0; gap: 6px; }
+  .pane small { color: var(--muted); }
+  #terminal { flex: 1; min-height: 0; overflow: auto; border: 2px solid var(--line); background: #0d0d0d; padding: 10px; font: 13px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+  .ok { color: var(--ok); } .ok a { color: inherit; } .err { color: var(--err); } .dim { color: var(--muted); }
+
+  dialog { background: var(--panel); color: var(--text); border: 2px solid var(--line); width: min(340px, 92vw); }
+  dialog::backdrop { background: #000a; }
+  dialog form { display: flex; flex-direction: column; gap: 10px; }
+  select { font: inherit; background: var(--panel); color: var(--text); border: 2px solid var(--line); padding: 8px; }
+
+  @media (max-width: 760px) {
+    body { padding: 6px; }
+    .frame { height: auto; min-height: 100%; }
+    header { grid-template-columns: 1fr; }
+    #app { grid-template-columns: 1fr; grid-auto-rows: minmax(180px, auto); }
+    #ids { height: 200px; }
+    #terminal { min-height: 260px; }
+    footer { flex-direction: column; align-items: stretch; }
+    .actions button { flex: 1; }
+    .mark { margin: 0 auto; }
+  }
+
+  /* Every Word Starts With A Capital Letter (display only; typed values and links stay untouched) */
+  body { text-transform: capitalize; }
+  input, textarea { text-transform: none; }
+  input::placeholder, textarea::placeholder { text-transform: capitalize; }
+  #terminal a { text-transform: none; }
+  /* Date, time and user name: green + bold only */
+  #clock, #userName { color: var(--ok); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <div class="box" id="userBox"><span id="userName">&nbsp;</span>
+      <button class="box hidden" id="addUserBtn" style="padding:2px 8px">+ User</button>
+      <button class="box hidden" id="logoutBtn" style="padding:2px 8px">Logout</button>
+    </div>
+    <div class="box" id="clock">--</div>
+  </header>
+
+  <main>
+    <section id="login">
+      <div class="login-card">
+        <input id="u" placeholder="User Name" autocomplete="username">
+        <input id="p" type="password" placeholder="Password" autocomplete="current-password">
+        <div class="btn-row">
+          <button class="box" id="adminBtn">Admin Login</button>
+          <button class="box" id="userBtn">User Login</button>
+        </div>
+        <div class="msg" id="loginMsg"></div>
+      </div>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="pane">
+        <textarea id="ids" class="" placeholder="Paste or type Loan IDs (numbers only). A space starts a new Loan ID." spellcheck="false" inputmode="numeric"></textarea>
+        <small id="count">0 loan IDs</small>
+      </div>
+      <div class="pane"><div id="terminal" aria-live="polite"><span class="dim">Terminal ready. Add Loan IDs and press Run: a link opens in a new tab for each.</span></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="actions">
+      <button class="box hidden" id="runBtn">Run</button>
+      <button class="box hidden" id="clearBtn">Clear All</button>
+    </div>
+    <span class="mark">Created by &lt;Syntax/&gt;</span>
+  </footer>
+</div>
+
+<dialog id="userDlg">
+  <form method="dialog" id="userForm">
+    <strong>Add user</strong>
+    <input id="nu" placeholder="Username">
+    <input id="np" type="password" placeholder="Password (6+ chars)">
+    <select id="nr"><option value="user">User</option><option value="admin">Admin</option></select>
+    <div class="msg" id="userMsg"></div>
+    <div class="btn-row">
+      <button class="box" type="button" id="userCancel">Cancel</button>
+      <button class="box" type="submit">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* DEMO ONLY: fake login backend (users live in memory until the page is refreshed). Logins: admin/admin123, user/user123 */
+(function(){const real=window.fetch;const db={admin:{role:'admin',pass:'admin123'},user:{role:'user',pass:'user123'}};let me=null;
+const J=(o,c=200)=>new Response(JSON.stringify(o),{status:c,headers:{'Content-Type':'application/json'}});
+window.fetch=async(url,opt={})=>{if(!String(url).startsWith('/api/'))return real(url,opt);
+const b=opt.body?JSON.parse(opt.body):{};
+if(url==='/api/me')return me?J(me):J({error:'Not logged in'},401);
+if(url==='/api/login'){const u=Object.hasOwn(db,b.username)?db[b.username]:null;
+if(u&&u.pass===b.password&&(b.mode!=='admin'||u.role==='admin')){me={username:b.username,role:u.role};return J(me)}
+return J({error:b.mode==='admin'?'Invalid admin credentials':'Invalid username or password'},401)}
+if(url==='/api/logout'){me=null;return J({ok:true})}
+if(url==='/api/users'){if(!me||me.role!=='admin')return J({error:'Admin only'},403);
+if(!/^[A-Za-z0-9._-]{3,32}$/.test(b.username||''))return J({error:'Username: 3-32 letters/numbers/._-'},400);
+if(typeof b.password!=='string'||b.password.length<6)return J({error:'Password must be 6+ characters'},400);
+if(Object.hasOwn(db,b.username))return J({error:'User already exists'},409);
+db[b.username]={role:b.role==='admin'?'admin':'user',pass:b.password};return J({ok:true})}
+return J({error:'Not found'},404)}})();
+</script>
+<script>
+const $ = id => document.getElementById(id);
+
+/* ----- clock (viewer's local time) ----- */
+function tick() { $('clock').textContent = new Date().toLocaleString([], { dateStyle: 'full', timeStyle: 'medium' }); }
+tick(); setInterval(tick, 1000);
+
+/* ----- api ----- */
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Request failed');
+  return j;
+}
+
+/* ----- views ----- */
+function showApp(me) {
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('runBtn').classList.remove('hidden');
+  $('clearBtn').classList.remove('hidden');
+  $('logoutBtn').classList.remove('hidden');
+  $('addUserBtn').classList.toggle('hidden', me.role !== 'admin');
+  $('userName').textContent = me.username + (me.role === 'admin' ? ' (admin)' : '');
+}
+function showLogin() {
+  $('login').classList.remove('hidden');
+  $('app').classList.add('hidden');
+  ['runBtn', 'clearBtn', 'logoutBtn', 'addUserBtn'].forEach(i => $(i).classList.add('hidden'));
+  $('userName').innerHTML = '&nbsp;';
+  $('p').value = '';
+}
+async function login(mode) {
+  $('loginMsg').textContent = '';
+  try { showApp(await post('/api/login', { username: $('u').value.trim(), password: $('p').value, mode })); }
+  catch (e) { $('loginMsg').textContent = e.message; }
+}
+$('adminBtn').onclick = () => login('admin');
+$('userBtn').onclick = () => login('user');
+$('p').addEventListener('keydown', e => { if (e.key === 'Enter') login('user'); });
+$('logoutBtn').onclick = async () => { await post('/api/logout'); showLogin(); };
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(me => me && showApp(me));
+
+/* ----- loan ID box: typing allows digits only; space / comma / new line = next loan ID ----- */
+const ids = $('ids');
+const BASE = 'https://loanplus.lk/admin#/loans/';
+const buildUrl = id => BASE + id + '/show';
+const norm = s => s.replace(/[ \t\r\n,;]+/g, '\n');
+const tokens = () => ids.value.split('\n').map(s => s.trim()).filter(Boolean);
+function updateCount() { $('count').textContent = tokens().length + ' loan IDs'; }
+ids.addEventListener('beforeinput', e => {
+  if (e.inputType === 'insertText' && e.data && /[^\d\s,;]/.test(e.data)) e.preventDefault();
+});
+ids.addEventListener('input', () => {
+  const pos = ids.selectionStart;
+  const before = norm(ids.value.slice(0, pos));
+  const all = norm(ids.value);
+  if (all !== ids.value) { ids.value = all; ids.setSelectionRange(before.length, before.length); }
+  updateCount();
+});
+ids.addEventListener('paste', e => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');   // plain text = "Keep Formatting" from Excel
+  ids.setRangeText(norm(text.trim()) + '\n', ids.selectionStart, ids.selectionEnd, 'end');
+  ids.value = ids.value.replace(/\n{2,}/g, '\n');
+  updateCount();
+});
+
+/* ----- run: build links, show in terminal, open each in its own tab ----- */
+const term = $('terminal');
+function line(text, cls) {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  term.appendChild(d);
+  term.scrollTop = term.scrollHeight;
+  return d;
+}
+$('runBtn').onclick = () => {          // all window.open calls stay inside this click so the browser treats them as user-initiated
+  term.innerHTML = '';
+  const list = tokens();
+  if (!list.length) { line('✖ No loan IDs entered.', 'err'); return; }
+  line(`> Processing ${list.length} value(s)`, 'dim');
+  const seen = new Set(), good = []; let bad = 0;
+  for (const v of list) {
+    if (!/^\d+$/.test(v)) { line(`✖ "${v}" - invalid, numbers only`, 'err'); bad++; }
+    else {
+      if (seen.has(v)) { line(`✖ ${v} - duplicate (opening again anyway)`, 'err'); bad++; }
+      seen.add(v); good.push(v);
+      const url = buildUrl(v);
+      const d = line(`✔ Loan ${v} → `, 'ok');
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url;
+      d.appendChild(a);
+    }
+  }
+  let opened = 0, blocked = 0;
+  if (good.length) {
+    for (const v of good) {
+      const w = window.open(buildUrl(v), '_blank');
+      if (w) { w.opener = null; opened++; } else blocked++;
+    }
+  }
+  term.scrollTop = term.scrollHeight;
+  line(`> Done. ${good.length} link(s) created, ${opened} tab(s) opened, ${bad} issue(s).`, 'dim');
+  if (blocked) line(`✖ ${blocked} tab(s) blocked by the browser. Allow pop-ups for this site and press Run again, or click the green links.`, 'err');
+};
+
+$('clearBtn').onclick = () => {
+  ids.value = ''; updateCount();
+  term.innerHTML = '<span class="dim">Terminal ready. Add Loan IDs and press Run: a link opens in a new tab for each.</span>';
+  ids.focus();
+};
+
+/* ----- admin: add user ----- */
+const dlg = $('userDlg');
+$('addUserBtn').onclick = () => { $('userMsg').textContent = ''; dlg.showModal(); };
+$('userCancel').onclick = () => dlg.close();
+$('userForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const m = $('userMsg'); m.style.color = ''; m.textContent = '';
+  try {
+    await post('/api/users', { username: $('nu').value.trim(), password: $('np').value, role: $('nr').value });
+    $('nu').value = $('np').value = '';
+    m.style.color = 'var(--ok)'; m.textContent = 'User created ✔';
+    setTimeout(() => { dlg.close(); m.textContent = ''; m.style.color = ''; }, 900);
+  } catch (err) { m.textContent = err.message; }
+});
+</script>
+</body>
+</html>
